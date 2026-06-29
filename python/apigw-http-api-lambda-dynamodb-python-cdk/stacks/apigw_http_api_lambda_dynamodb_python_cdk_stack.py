@@ -14,6 +14,7 @@ from aws_cdk import (
     aws_cloudtrail as cloudtrail,
     aws_s3 as s3,
     Duration,
+    BundlingOptions,
 )
 from constructs import Construct
 
@@ -87,13 +88,22 @@ class ApigwHttpApiLambdaDynamodbPythonCdkStack(Stack):
             stream=dynamodb_.StreamViewType.NEW_AND_OLD_IMAGES
         )
 
-        # SEC04-BP01: Create the Lambda function with log retention policy
+        # REL06-BP07: Create Lambda function with X-Ray tracing and bundled dependencies
         api_hanlder = lambda_.Function(
             self,
             "ApiHandler",
             function_name="apigw_handler",
             runtime=lambda_.Runtime.PYTHON_3_9,
-            code=lambda_.Code.from_asset("lambda/apigw-handler"),
+            code=lambda_.Code.from_asset(
+                "lambda/apigw-handler",
+                bundling=BundlingOptions(
+                    image=lambda_.Runtime.PYTHON_3_9.bundling_image,
+                    command=[
+                        "bash", "-c",
+                        "pip install -r requirements.txt -t /asset-output && cp -au . /asset-output"
+                    ]
+                )
+            ),
             handler="index.handler",
             vpc=vpc,
             vpc_subnets=ec2.SubnetSelection(
@@ -101,7 +111,8 @@ class ApigwHttpApiLambdaDynamodbPythonCdkStack(Stack):
             ),
             memory_size=1024,
             timeout=Duration.minutes(5),
-            log_retention=logs.RetentionDays.ONE_YEAR
+            log_retention=logs.RetentionDays.ONE_YEAR,
+            tracing=lambda_.Tracing.ACTIVE
         )
 
         # grant permission to lambda to write to demo table
@@ -116,7 +127,7 @@ class ApigwHttpApiLambdaDynamodbPythonCdkStack(Stack):
             removal_policy=RemovalPolicy.DESTROY
         )
 
-        # SEC04-BP01: Create API Gateway with logging enabled
+        # REL06-BP07: Create API Gateway with X-Ray tracing and logging enabled
         apigw_.LambdaRestApi(
             self,
             "Endpoint",
@@ -125,7 +136,8 @@ class ApigwHttpApiLambdaDynamodbPythonCdkStack(Stack):
                 access_log_destination=apigw_.LogGroupLogDestination(api_log_group),
                 access_log_format=apigw_.AccessLogFormat.clf(),
                 logging_level=apigw_.MethodLoggingLevel.INFO,
-                data_trace_enabled=True
+                data_trace_enabled=True,
+                tracing_enabled=True
             )
         )
 
