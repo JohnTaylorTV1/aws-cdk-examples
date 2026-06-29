@@ -5,6 +5,7 @@ import os
 from aws_cdk import (
     Stack,
     RemovalPolicy,
+    CfnOutput,
     aws_dynamodb as dynamodb_,
     aws_lambda as lambda_,
     aws_apigateway as apigw_,
@@ -135,7 +136,7 @@ class ApigwHttpApiLambdaDynamodbPythonCdkStack(Stack):
         # REL05-BP02: Create API Gateway with explicit throttling limits
         # Throttle settings: 500 burst capacity, 1000 RPS steady-state
         # These limits prevent resource exhaustion while allowing legitimate traffic spikes
-        apigw_.LambdaRestApi(
+        api = apigw_.LambdaRestApi(
             self,
             "Endpoint",
             handler=api_hanlder,
@@ -148,6 +149,47 @@ class ApigwHttpApiLambdaDynamodbPythonCdkStack(Stack):
                 throttling_burst_limit=500,
                 throttling_rate_limit=1000
             )
+        )
+
+        # REL05-BP02: Create API Key for consumer identification
+        api_key = apigw_.ApiKey(
+            self,
+            "ApiKey",
+            description="API key for basic tier consumer"
+        )
+
+        # REL05-BP02: Create Usage Plan with per-consumer throttling and quota
+        # Basic tier: 100 RPS, 200 burst, 10k requests/day
+        # Provides granular control over individual API consumers
+        usage_plan = apigw_.UsagePlan(
+            self,
+            "UsagePlan",
+            name="BasicUsagePlan",
+            description="Basic tier usage plan with per-consumer limits",
+            throttle=apigw_.ThrottleSettings(
+                rate_limit=100,
+                burst_limit=200
+            ),
+            quota=apigw_.QuotaSettings(
+                limit=10000,
+                period=apigw_.Period.DAY
+            )
+        )
+
+        # Associate Usage Plan with API stage
+        usage_plan.add_api_stage(
+            stage=api.deployment_stage
+        )
+
+        # Associate API Key with Usage Plan
+        usage_plan.add_api_key(api_key)
+
+        # Output API Key ID for retrieval
+        CfnOutput(
+            self,
+            "ApiKeyId",
+            value=api_key.key_id,
+            description="API Key ID - retrieve value with: aws apigateway get-api-key --api-key <id> --include-value"
         )
 
         # SEC04-BP01: Create S3 bucket for CloudTrail logs
