@@ -27,6 +27,19 @@ This stack implements best practices from the AWS Well-Architected Framework:
 - **VPC Flow Logs**: 1 month
 - **CloudTrail Logs**: Stored in S3 with configurable lifecycle
 
+### REL05-BP02: Throttle requests
+
+**API Gateway Throttling:**
+- **Burst Limit**: 500 concurrent requests - Handles short traffic spikes while preventing resource exhaustion
+- **Rate Limit**: 1000 requests per second - Steady-state throughput limit for predictable backend capacity
+- **Protection**: Mitigates retry storms, flooding attacks, and unexpected traffic spikes
+
+**Benefits:**
+- Prevents Lambda concurrency exhaustion
+- Protects DynamoDB from excessive write traffic
+- Returns HTTP 429 (Too Many Requests) when limits exceeded
+- Allows workload to operate normally under unexpected volume spikes
+
 ### REL06-BP07: Monitor end-to-end tracing of requests through your system
 
 **Distributed Tracing Features:**
