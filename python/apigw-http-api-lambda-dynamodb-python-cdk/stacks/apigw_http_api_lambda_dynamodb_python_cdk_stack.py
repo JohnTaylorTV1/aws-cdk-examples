@@ -132,7 +132,9 @@ class ApigwHttpApiLambdaDynamodbPythonCdkStack(Stack):
             removal_policy=RemovalPolicy.DESTROY
         )
 
-        # REL06-BP07: Create API Gateway with X-Ray tracing and logging enabled
+        # REL05-BP02: Create API Gateway with explicit throttling limits
+        # Throttle settings: 500 burst capacity, 1000 RPS steady-state
+        # These limits prevent resource exhaustion while allowing legitimate traffic spikes
         apigw_.LambdaRestApi(
             self,
             "Endpoint",
@@ -142,7 +144,9 @@ class ApigwHttpApiLambdaDynamodbPythonCdkStack(Stack):
                 access_log_format=apigw_.AccessLogFormat.clf(),
                 logging_level=apigw_.MethodLoggingLevel.INFO,
                 data_trace_enabled=True,
-                tracing_enabled=True
+                tracing_enabled=True,
+                throttling_burst_limit=500,
+                throttling_rate_limit=1000
             )
         )
 
