@@ -5,6 +5,7 @@ import os
 from aws_cdk import (
     Stack,
     RemovalPolicy,
+    CfnOutput,
     aws_dynamodb as dynamodb_,
     aws_lambda as lambda_,
     aws_apigateway as apigw_,
@@ -190,6 +191,47 @@ class ApigwHttpApiLambdaDynamodbPythonCdkStack(Stack):
             "WebACLAssociation",
             resource_arn=f"arn:aws:apigateway:{self.region}::/restapis/{api.rest_api_id}/stages/{api.deployment_stage.stage_name}",
             web_acl_arn=web_acl.attr_arn
+        )
+
+        # REL05-BP02: Create API Key for consumer identification
+        api_key = apigw_.ApiKey(
+            self,
+            "ApiKey",
+            description="API key for basic tier consumer"
+        )
+
+        # REL05-BP02: Create Usage Plan with per-consumer throttling and quota
+        # Basic tier: 100 RPS, 200 burst, 10k requests/day
+        # Provides granular control over individual API consumers
+        usage_plan = apigw_.UsagePlan(
+            self,
+            "UsagePlan",
+            name="BasicUsagePlan",
+            description="Basic tier usage plan with per-consumer limits",
+            throttle=apigw_.ThrottleSettings(
+                rate_limit=100,
+                burst_limit=200
+            ),
+            quota=apigw_.QuotaSettings(
+                limit=10000,
+                period=apigw_.Period.DAY
+            )
+        )
+
+        # Associate Usage Plan with API stage
+        usage_plan.add_api_stage(
+            stage=api.deployment_stage
+        )
+
+        # Associate API Key with Usage Plan
+        usage_plan.add_api_key(api_key)
+
+        # Output API Key ID for retrieval
+        CfnOutput(
+            self,
+            "ApiKeyId",
+            value=api_key.key_id,
+            description="API Key ID - retrieve value with: aws apigateway get-api-key --api-key <id> --include-value"
         )
 
         # SEC04-BP01: Create S3 bucket for CloudTrail logs

@@ -34,9 +34,17 @@ This stack implements best practices from the AWS Well-Architected Framework:
 - **Rate Limit**: 1000 requests per second - Steady-state throughput limit for predictable backend capacity
 - **Protection**: Mitigates retry storms, flooding attacks, and unexpected traffic spikes
 
+**Usage Plans (Per-Consumer Throttling):**
+- **API Key Authentication**: Identifies and tracks individual API consumers
+- **Per-Consumer Rate Limit**: 100 requests per second per API key
+- **Per-Consumer Burst**: 200 concurrent requests per API key
+- **Daily Quota**: 10,000 requests per day per consumer
+
 **Benefits:**
 - Prevents Lambda concurrency exhaustion
 - Protects DynamoDB from excessive write traffic
+- Isolates high-volume consumers from impacting others
+- Enables tracking and accountability for API usage
 - Returns HTTP 429 (Too Many Requests) when limits exceeded
 - Allows workload to operate normally under unexpected volume spikes
 
@@ -111,8 +119,32 @@ $ cdk deploy --profile test
 
 ## After Deploy
 
+### Retrieve API Key
+
+After deployment, retrieve the API key value to make authenticated requests:
+
+```bash
+# Get the API Key ID from stack outputs
+API_KEY_ID=$(aws cloudformation describe-stacks \
+  --stack-name ApigwHttpApiLambdaDynamodbPythonCdkStack \
+  --query 'Stacks[0].Outputs[?OutputKey==`ApiKeyId`].OutputValue' \
+  --output text)
+
+# Get the API Key value
+aws apigateway get-api-key --api-key $API_KEY_ID --include-value
+```
+
 ### Testing the API
-Navigate to AWS API Gateway console and test the API with below sample data 
+
+**With API Key (Required for Usage Plan enforcement):**
+```bash
+curl -X POST https://<api-id>.execute-api.<region>.amazonaws.com/prod/ \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: <your-api-key-value>" \
+  -d '{"year":"2023","title":"test","id":"1"}'
+```
+
+**Test data:**
 ```json
 {
     "year":"2023", 
@@ -121,7 +153,7 @@ Navigate to AWS API Gateway console and test the API with below sample data
 }
 ```
 
-You should get below response 
+**Expected response:**
 
 ```json
 {"message": "Successfully inserted data!"}
