@@ -8,6 +8,25 @@ Creates an [AWS Lambda](https://aws.amazon.com/lambda/) function writing to [Ama
 
 ![architecture](docs/architecture.png)
 
+## AWS Well-Architected Framework Compliance
+
+This stack implements **SEC04-BP01: Configure service and application logging** from the AWS Well-Architected Framework Security Pillar.
+
+### Security Logging Features
+
+- **API Gateway Logging**: Access logs and execution logs with CloudWatch integration
+- **Lambda Logging**: CloudWatch Logs with 1-year retention policy
+- **VPC Flow Logs**: Network traffic monitoring for security analysis
+- **CloudTrail**: API activity tracking across all AWS services
+- **DynamoDB Audit**: Point-in-Time Recovery and Streams for data change tracking
+
+### Log Retention Policies
+
+- **API Gateway Logs**: 1 year
+- **Lambda Function Logs**: 1 year
+- **VPC Flow Logs**: 1 month
+- **CloudTrail Logs**: Stored in S3 with configurable lifecycle
+
 ## Setup
 
 The `cdk.json` file tells the CDK Toolkit how to execute your app.
@@ -70,6 +89,8 @@ $ cdk deploy --profile test
 ```
 
 ## After Deploy
+
+### Testing the API
 Navigate to AWS API Gateway console and test the API with below sample data 
 ```json
 {
@@ -83,6 +104,37 @@ You should get below response
 
 ```json
 {"message": "Successfully inserted data!"}
+```
+
+### Accessing Logs
+
+**API Gateway Logs:**
+```bash
+# View access logs
+aws logs tail /aws/apigateway/ApigwHttpApiLambdaDynamodbPythonCdkStack --follow
+
+# Query with CloudWatch Insights
+aws logs start-query --log-group-name /aws/apigateway/ApigwHttpApiLambdaDynamodbPythonCdkStack \
+  --query-string 'fields @timestamp, @message | sort @timestamp desc | limit 20'
+```
+
+**Lambda Logs:**
+```bash
+# View Lambda execution logs
+aws logs tail /aws/lambda/apigw_handler --follow
+```
+
+**VPC Flow Logs:**
+```bash
+# Query VPC Flow Logs
+aws logs start-query --log-group-name VpcFlowLogs \
+  --query-string 'fields @timestamp, srcAddr, dstAddr, action | filter action = "REJECT"'
+```
+
+**CloudTrail:**
+```bash
+# Query CloudTrail events
+aws cloudtrail lookup-events --lookup-attributes AttributeKey=EventName,AttributeValue=PutItem
 ```
 
 ## Cleanup 
