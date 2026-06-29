@@ -10,22 +10,30 @@ Creates an [AWS Lambda](https://aws.amazon.com/lambda/) function writing to [Ama
 
 ## AWS Well-Architected Framework Compliance
 
-This stack implements **SEC04-BP01: Configure service and application logging** from the AWS Well-Architected Framework Security Pillar.
+This stack implements best practices from the AWS Well-Architected Framework:
 
-### Security Logging Features
+### SEC04-BP01: Configure service and application logging
 
+**Security Logging Features:**
 - **API Gateway Logging**: Access logs and execution logs with CloudWatch integration
 - **Lambda Logging**: CloudWatch Logs with 1-year retention policy
 - **VPC Flow Logs**: Network traffic monitoring for security analysis
 - **CloudTrail**: API activity tracking across all AWS services
 - **DynamoDB Audit**: Point-in-Time Recovery and Streams for data change tracking
 
-### Log Retention Policies
-
+**Log Retention Policies:**
 - **API Gateway Logs**: 1 year
 - **Lambda Function Logs**: 1 year
 - **VPC Flow Logs**: 1 month
 - **CloudTrail Logs**: Stored in S3 with configurable lifecycle
+
+### REL06-BP07: Monitor end-to-end tracing of requests through your system
+
+**Distributed Tracing Features:**
+- **Lambda X-Ray Tracing**: Active tracing enabled for function execution visibility
+- **API Gateway X-Ray Tracing**: Request tracing from API Gateway through downstream services
+- **DynamoDB Instrumentation**: Automatic tracing of DynamoDB API calls via X-Ray SDK
+- **End-to-End Visibility**: Complete request flow from API Gateway → Lambda → DynamoDB
 
 ## Setup
 
@@ -136,6 +144,33 @@ aws logs start-query --log-group-name VpcFlowLogs \
 # Query CloudTrail events
 aws cloudtrail lookup-events --lookup-attributes AttributeKey=EventName,AttributeValue=PutItem
 ```
+
+### Analyzing X-Ray Traces
+
+**View Service Map:**
+```bash
+# Open X-Ray console to view service map
+aws xray get-service-graph --start-time $(date -u -d '5 minutes ago' +%s) --end-time $(date -u +%s)
+```
+
+**Analyze Traces:**
+```bash
+# Get trace summaries
+aws xray get-trace-summaries \
+  --start-time $(date -u -d '1 hour ago' +%s) \
+  --end-time $(date -u +%s) \
+  --filter-expression 'service(id(name: "apigw_handler", type: "AWS::Lambda::Function"))'
+
+# Get detailed trace
+aws xray batch-get-traces --trace-ids <trace-id>
+```
+
+**X-Ray Console:**
+Navigate to AWS X-Ray console to:
+- View the service map showing API Gateway → Lambda → DynamoDB
+- Analyze trace timelines and latencies
+- Identify performance bottlenecks
+- Debug errors with detailed subsegment information
 
 ## Cleanup 
 Run below script to delete AWS resources created by this sample stack.
