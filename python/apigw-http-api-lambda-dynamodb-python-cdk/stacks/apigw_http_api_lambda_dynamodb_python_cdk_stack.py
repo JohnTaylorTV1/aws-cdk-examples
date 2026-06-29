@@ -14,6 +14,7 @@ from aws_cdk import (
     aws_logs as logs,
     aws_cloudtrail as cloudtrail,
     aws_s3 as s3,
+    aws_wafv2 as wafv2,
     Duration,
     BundlingOptions,
 )
@@ -149,6 +150,47 @@ class ApigwHttpApiLambdaDynamodbPythonCdkStack(Stack):
                 throttling_burst_limit=500,
                 throttling_rate_limit=1000
             )
+        )
+
+        # REL05-BP02: Create WAF Web ACL with IP-based rate limiting
+        # Rate limit: 2000 requests per 5 minutes per IP address
+        # Protects against DDoS, web scraping, and credential stuffing
+        web_acl = wafv2.CfnWebACL(
+            self,
+            "ApiGatewayWebACL",
+            scope="REGIONAL",
+            default_action=wafv2.CfnWebACL.DefaultActionProperty(allow={}),
+            visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
+                cloud_watch_metrics_enabled=True,
+                metric_name="ApiGatewayWebACL",
+                sampled_requests_enabled=True
+            ),
+            rules=[
+                wafv2.CfnWebACL.RuleProperty(
+                    name="RateLimitRule",
+                    priority=1,
+                    statement=wafv2.CfnWebACL.StatementProperty(
+                        rate_based_statement=wafv2.CfnWebACL.RateBasedStatementProperty(
+                            limit=2000,
+                            aggregate_key_type="IP"
+                        )
+                    ),
+                    action=wafv2.CfnWebACL.RuleActionProperty(block={}),
+                    visibility_config=wafv2.CfnWebACL.VisibilityConfigProperty(
+                        cloud_watch_metrics_enabled=True,
+                        metric_name="RateLimitRule",
+                        sampled_requests_enabled=True
+                    )
+                )
+            ]
+        )
+
+        # Associate WAF Web ACL with API Gateway stage
+        wafv2.CfnWebACLAssociation(
+            self,
+            "WebACLAssociation",
+            resource_arn=f"arn:aws:apigateway:{self.region}::/restapis/{api.rest_api_id}/stages/{api.deployment_stage.stage_name}",
+            web_acl_arn=web_acl.attr_arn
         )
 
         # REL05-BP02: Create API Key for consumer identification
