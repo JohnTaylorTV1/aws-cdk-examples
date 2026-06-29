@@ -88,7 +88,11 @@ class ApigwHttpApiLambdaDynamodbPythonCdkStack(Stack):
             stream=dynamodb_.StreamViewType.NEW_AND_OLD_IMAGES
         )
 
-        # REL06-BP07: Create Lambda function with X-Ray tracing and bundled dependencies
+        # REL05-BP02: Create Lambda function with reserved concurrency
+        # REL06-BP07: X-Ray tracing and bundled dependencies
+        # Reserved concurrency: 100 concurrent executions
+        # Calculation: Expected burst traffic ~500 RPS * avg execution time ~200ms = 100 concurrent
+        # This prevents this function from consuming entire account concurrency quota (1000)
         api_hanlder = lambda_.Function(
             self,
             "ApiHandler",
@@ -112,7 +116,8 @@ class ApigwHttpApiLambdaDynamodbPythonCdkStack(Stack):
             memory_size=1024,
             timeout=Duration.minutes(5),
             log_retention=logs.RetentionDays.ONE_YEAR,
-            tracing=lambda_.Tracing.ACTIVE
+            tracing=lambda_.Tracing.ACTIVE,
+            reserved_concurrent_executions=100
         )
 
         # grant permission to lambda to write to demo table
